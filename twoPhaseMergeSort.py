@@ -1,4 +1,5 @@
 import os.path
+import sys
 from os import path
 
 def printError(error):
@@ -27,25 +28,72 @@ def getTupleSize(colDetails):
         ans = ans + t[1]
     return ans
 
-def sortSubList(subList):
+def getIndex(colName,colDetails):
+    for i in range(len(colDetails)):
+        if (colDetails[i][0] == colName):
+            return i
+    printError("col name not in metadata "+colName)
+
+def sortSubList(subList,colOrder,colDetails):
+    if(len(colOrder)==0):
+        subList.sort()
+        return subList
     #implement sort here for now just doing nothing
+    def newOrder(x):
+        ans = []
+        for c in colOrder:
+            i = getIndex(c,colDetails)
+            ans.append(x[i])
+        return tuple(ans)
+    #subList.sort(key = lambda x :(x[0],x[1]))
+    subList.sort(key = newOrder)
     return subList
 
 def saveAsFile(currSubList,path):
     #currSubList has list of tuples
     with open(path,'w') as filehandle:
         for t in currSubList:
-            filehandle.write('%s\n' % str(t))
+            for s in t:
+                filehandle.write('%s  ' % s)
+            filehandle.write('\n')
 
+def checkIfAllColsExist(colOrder,colDetails):
+    colList = [c[0] for c in colDetails]
+    for c in colOrder:
+        if c not in colList:
+            printError("Col not present in metadata : "+c)
 
 def main():
-    memLimit = 500 # this value is in MB
-    #memLimit = 5*1024*1024 #converting to bytes
-    fileToSort = "input50.txt"
+    if(len(sys.argv) < 2):
+        printError("Input not provided")
+    query = sys.argv[1]
+    print(query)
+    data = query.split(' ')
+    data = [t.strip() for t in data]
+    if(len(data)<4):
+        printError("Query is missing some data")
+
+    fileToSort = data[0]
     if(not path.exists(fileToSort)):
         printError("file to sort does not exist "+fileToSort)
+    outputPath = data[1]
+    if( not data[2].isdigit()):
+        printError("Memory should be a digit : "+data[2])
+    memLimit = int(data[2]) # now taking as bytes later enter as MB
+    if(data[3].lower() != "asc" and data[3].lower() != "desc"):
+        printError("order must be mentioned either asc or desc")
+    sortingOrder = data[3].lower()
+
+    colOrder = []
+    for k in range(4,len(data)):
+        colOrder.append(data[k])
+    print("order by col : ",colOrder)
+
     metaDataFile = "Metadata.txt"
     colDetails = parseMetadataFile(metaDataFile)
+
+    checkIfAllColsExist(colOrder,colDetails)
+
     sizeOfTuple = getTupleSize(colDetails)
     print("size of each tuple is : ",sizeOfTuple)
     noOfTuplesInSubList = int(memLimit/sizeOfTuple)
@@ -57,7 +105,7 @@ def main():
     while True:
         if(len(currSubList)==noOfTuplesInSubList):
             #sort the sublist
-            currSubList = sortSubList(currSubList)
+            currSubList = sortSubList(currSubList,colOrder,colDetails)
             #save the current sublist as sublist+sublistIndex
             saveAsFile(currSubList,"subList"+str(sublistIndex)+".txt")
             sublistIndex = sublistIndex +1
