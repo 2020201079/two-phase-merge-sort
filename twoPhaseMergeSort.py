@@ -1,5 +1,6 @@
 import os.path
 import sys
+from collections import defaultdict 
 from os import path
 
 def printError(error):
@@ -34,27 +35,31 @@ def getIndex(colName,colDetails):
             return i
     printError("col name not in metadata "+colName)
 
-def sortSubList(subList,colOrder,colDetails):
+def sortSubList(subList,colOrder,colDetails,sortingOrder):
     if(len(colOrder)==0):
         subList.sort()
         return subList
-    #implement sort here for now just doing nothing
     def newOrder(x):
         ans = []
         for c in colOrder:
             i = getIndex(c,colDetails)
             ans.append(x[i])
         return tuple(ans)
-    #subList.sort(key = lambda x :(x[0],x[1]))
-    subList.sort(key = newOrder)
+    if(sortingOrder.lower() == "asc"):
+        subList.sort(key = newOrder)
+    else:
+        subList.sort(key = newOrder,reverse=True)
     return subList
 
 def saveAsFile(currSubList,path):
     #currSubList has list of tuples
-    with open(path,'w') as filehandle:
+    with open(path,'a') as filehandle:
         for t in currSubList:
             for s in t:
-                filehandle.write('%s  ' % s)
+                if(s != t[len(t)-1]):
+                    filehandle.write('%s  ' % s)
+                else:
+                    filehandle.write('%s' % s)
             filehandle.write('\n')
 
 def checkIfAllColsExist(colOrder,colDetails):
@@ -62,6 +67,57 @@ def checkIfAllColsExist(colOrder,colDetails):
     for c in colOrder:
         if c not in colList:
             printError("Col not present in metadata : "+c)
+
+def parseLineRead(words,colDetails): #return the record as python tuple as per metadata
+    startIndex = 0
+    output = []
+    for c in colDetails:
+        if(startIndex+c[1]>=len(words)):
+            printError("Metadata format and record do not match "+ words)
+        currVal = words[startIndex:startIndex+c[1]]
+        output.append(currVal)
+        startIndex += c[1]+2 # 2 spaces after each col
+    outputTuple = tuple(output)
+    return outputTuple
+
+def getFileHandlers(numOfSublist):
+    ans = []
+    for i in range(1,numOfSublist+1):
+        fileName = "subList"+str(i)+".txt"
+        if not path.exists(fileName):
+            printError("sublist is not created "+fileName)
+        f = open(fileName,'r')
+        ans.append(f)
+    return ans
+
+def readFromSubList(filehandle,maxTuples,colDetails):
+    currSubList = []
+    for i in range(maxTuples):
+        words = filehandle.readline()
+        if not words:
+            filehandle.close()
+            return currSubList
+        else:
+            outputTuple = parseLineRead(words,colDetails)
+            currSubList.append(outputTuple)
+    return currSubList
+
+def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder):
+    noOfFiles = len(fileHandlers)
+    currMinValues = []
+    for i in range(noOfFiles):
+        if(data[i] == [] and not fileHandlers[i].closed):
+            data[i] = readFromSubList(fileHandlers[i],phase2MaxNumberOfTuples,colDetails)
+            if(data[i] != []):
+                currMinValues.append(data[i][0])
+                data[i].pop(0)
+        else:
+            currMinValues.append(data[i][0])
+            data[i].pop(0)
+    sortedSubList = sortSubList(currMinValues,colOrder,colDetails,sortingOrder)
+    if(sortedSubList == []):
+        return []
+    return sortedSubList[0]
 
 def main():
     if(len(sys.argv) < 2):
@@ -98,26 +154,54 @@ def main():
     print("size of each tuple is : ",sizeOfTuple)
     noOfTuplesInSubList = int(memLimit/sizeOfTuple)
     print("Number of tuples in a sublist : ",noOfTuplesInSubList)
-    
+    print(" ###start execution ")
+    print(" ## running Phase-1")
     inputFile = open(fileToSort,'r')
     currSubList = []
-    sublistIndex = 1
+    sublistIndex = 0
     while True:
         if(len(currSubList)==noOfTuplesInSubList):
-            #sort the sublist
-            currSubList = sortSubList(currSubList,colOrder,colDetails)
-            #save the current sublist as sublist+sublistIndex
-            saveAsFile(currSubList,"subList"+str(sublistIndex)+".txt")
             sublistIndex = sublistIndex +1
+            print("sorting sublist : ",str(sublistIndex))
+            currSubList = sortSubList(currSubList,colOrder,colDetails,sortingOrder)
+            print("writing to disk : ",str(sublistIndex))
+            saveAsFile(currSubList,"subList"+str(sublistIndex)+".txt")
             currSubList.clear()
-        words = inputFile.readline().strip()
+        words = inputFile.readline()
         if not words:
-            break # reached end of file here
-        output = [s.strip() for s in words.split('  ') if s]
-        if(len(output) != len(colDetails)):
-            printError("Number of cols do not match for : "+str(output))
-        outputTuple = tuple(output)
+            break
+        outputTuple = parseLineRead(words,colDetails)
         currSubList.append(outputTuple)
+    inputFile.close()
+    numOfSublist = sublistIndex
+    if(numOfSublist == 1):
+        #rename subList1.txt to output and close this func
+        print("whole file fits in mem at once so sorting at once writing to disk")
+        os.rename("subList1.txt",outputPath)
+        exit()
+    print("number of sublist : ",numOfSublist)
+    print("## running phase - 2")
+    sizeForEachSubFile = int(memLimit/(sublistIndex+1))
+    print("size available for each subfile :",str(sizeForEachSubFile))
+    if(sizeForEachSubFile < sizeOfTuple):
+        printError("size of file is too big for two phase merge sort. Increase mem or decrease file size")
+    phase2MaxNumberOfTuples = int(sizeForEachSubFile/sizeOfTuple)
 
+    #dic of list of tuples
+    fileHandlers = getFileHandlers(numOfSublist)
+    data = defaultdict(list)
+    outputBuffer = []
+    while True:
+        if(len(outputBuffer) >= phase2MaxNumberOfTuples):
+            saveAsFile(outputBuffer,outputPath)
+            outputBuffer.clear()
+        currMin = getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder)
+        if(currMin == []):
+            break
+        else:
+            outputBuffer.append(currMin)
+    if(len(outputBuffer) != 0):
+        saveAsFile(outputBuffer,outputPath)
+    
 if __name__ == '__main__':
     main()
