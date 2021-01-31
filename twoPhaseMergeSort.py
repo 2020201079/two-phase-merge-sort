@@ -1,5 +1,6 @@
 import os.path
 import sys
+import heapq
 from collections import defaultdict 
 from os import path
 from datetime import datetime
@@ -114,25 +115,77 @@ def readFromSubList(filehandle,maxTuples,colDetails):
             currSubList.append(outputTuple)
     return currSubList
 
-def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder):
+def newOrder(x,colOrder,colDetails):
+    ans = []
+    for c in colOrder:
+        i = getIndex(c,colDetails)
+        ans.append(x[i])
+    return tuple(ans)
+
+class comparableMin: # using class for custom comparator in heap
+    def __init__(self,tup,fileNo,colOrder,colDetails):
+        self.tup = tup
+        self.fileNo = fileNo
+        self.colOrder = colOrder
+        self.colDetails = colDetails
+
+    def __lt__(self,other):
+         newTuple1 = newOrder(self.tup,self.colOrder,self.colDetails)
+         newTuple2 = newOrder(other.tup,other.colOrder,other.colDetails)
+         return newTuple1 < newTuple2
+
+class comparableMax: # using class for custom comparator in heap
+    def __init__(self,tup,fileNo,colOrder,colDetails):
+        self.tup = tup
+        self.fileNo = fileNo
+        self.colOrder = colOrder
+        self.colDetails = colDetails
+
+    def __lt__(self,other):
+         newTuple1 = newOrder(self.tup,self.colOrder,self.colDetails)
+         newTuple2 = newOrder(other.tup,other.colOrder,other.colDetails)
+         return newTuple1 > newTuple2
+
+def initializeDataDic(data,fileHandlers,phase2MaxNumberOfTuples,colDetails):
     noOfFiles = len(fileHandlers)
-    currMinValues = []
     for i in range(noOfFiles):
         if(len(data[i]) == 0 and not fileHandlers[i].closed):
             data[i] = readFromSubList(fileHandlers[i],phase2MaxNumberOfTuples,colDetails)
-            if(data[i] != []):
-                currMinValues.append(data[i][0])
-        else:
-            if(len(data[i])>0):
-                currMinValues.append(data[i][0])
-    sortedSubList = sortSubList(currMinValues,colOrder,colDetails,sortingOrder)
-    if(sortedSubList == []):
-        return []
+    return data
+
+def makeCompObject(t,i,order,colOrder,colDetails):
+    if(order.lower() == "asc"):
+        ans = comparableMin(t,i,colOrder,colDetails)
+    else:
+        ans = comparableMax(t,i,colOrder,colDetails)
+    return ans
+
+def initializeHeapList(heap,data,sortedOrder,colOrder,colDetails):
     for i in range(len(data)):
-        if data[i]:
-            if data[i][0] == sortedSubList[0]:
-                data[i].pop(0)
-    return sortedSubList[0]
+        heapObject = makeCompObject(data[i][0],i,sortedOrder,colOrder,colDetails) # list of tuples
+        data[i].pop(0) # already present in heap so we can remove it
+        heap.append(heapObject)
+    heapq.heapify(heap)
+    return heap
+
+def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder,heap):
+    if not heap:
+        return []
+    ansObject = heapq.heappop(heap)
+    ans = ansObject.tup
+    filePoppedFrom = ansObject.fileNo
+    if(len(data[filePoppedFrom])>0):
+        currTup = data[filePoppedFrom][0]
+        tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
+        heapq.heappush(heap,tupleObj)
+        data[filePoppedFrom].pop(0)
+    elif(len(data[filePoppedFrom]) == 0 and not fileHandlers[filePoppedFrom].closed):
+        data[filePoppedFrom] = readFromSubList(fileHandlers[filePoppedFrom],phase2MaxNumberOfTuples,colDetails)
+        currTup = data[filePoppedFrom][0]
+        tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
+        heapq.heappush(heap,tupleObj)
+        data[filePoppedFrom].pop(0)
+    return ans
 
 def removeLastNewLine(outputfileHandler):
     outputfileHandler.seek(0,os.SEEK_END)
@@ -152,6 +205,7 @@ def deleteInterMediateFiles(numOfSublist):
 def printDefaultDicSizes(data):
     for i in range(len(data)):
         print("size "+str(i)+" : "+str(len(data[i])))
+
 def main():
     if(len(sys.argv) < 2):
         printError("Input not provided")
@@ -168,7 +222,8 @@ def main():
     outputPath = data[1]
     if( not data[2].isdigit()):
         printError("Memory should be a digit : "+data[2])
-    memLimit = int(data[2])*1024*1024
+    #memLimit = int(data[2])*1024*1024
+    memLimit = int(data[2])
     if(data[3].lower() != "asc" and data[3].lower() != "desc"):
         printError("order must be mentioned either asc or desc")
     sortingOrder = data[3].lower()
@@ -239,12 +294,16 @@ def main():
         os.remove(outputPath)
     outputfileHandler=open(outputPath, "a+")
     data = defaultdict(list)
+    data = initializeDataDic(data,fileHandlers,phase2MaxNumberOfTuples,colDetails)
+    heap = []
+    initializeHeapList(heap,data,sortingOrder,colOrder,colDetails) # heapify is applied
     outputBuffer = []
     while True:
         if(len(outputBuffer) >= phase2MaxNumberOfTuples):
             saveAsFileFileHandler(outputBuffer,outputfileHandler)
             outputBuffer.clear()
-        currMin = getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder)
+        printDefaultDicSizes(data)
+        currMin = getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder,heap)
         if(currMin == []):
             break
         else:
