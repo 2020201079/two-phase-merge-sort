@@ -2,6 +2,8 @@ import os.path
 import sys
 from collections import defaultdict 
 from os import path
+from datetime import datetime
+startTime = datetime.now()
 
 def printError(error):
     print(error)
@@ -143,6 +145,10 @@ def removeLastNewLine(outputfileHandler):
         outputfileHandler.truncate()
     outputfileHandler.close()
 
+def deleteInterMediateFiles(numOfSublist):
+    for i in range(1,numOfSublist+1):
+        os.remove("subList"+str(i)+".txt")
+
 def printDefaultDicSizes(data):
     for i in range(len(data)):
         print("size "+str(i)+" : "+str(len(data[i])))
@@ -162,7 +168,7 @@ def main():
     outputPath = data[1]
     if( not data[2].isdigit()):
         printError("Memory should be a digit : "+data[2])
-    memLimit = int(data[2]) # now taking as bytes later enter as MB
+    memLimit = int(data[2])*1024*1024
     if(data[3].lower() != "asc" and data[3].lower() != "desc"):
         printError("order must be mentioned either asc or desc")
     sortingOrder = data[3].lower()
@@ -216,11 +222,12 @@ def main():
         #rename subList1.txt to output and close this func
         print("whole file fits in mem at once so sorting at once writing to disk")
         os.rename("subList1.txt",outputPath)
-        exit()
+        return
     print("number of sublist : ",numOfSublist)
     print("## running phase - 2")
     sizeForEachSubFile = int(memLimit/(sublistIndex+1))
     print("size available for each subfile :",str(sizeForEachSubFile))
+    print("running ... ")
     if(sizeForEachSubFile < sizeOfTuple or memLimit < (numOfSublist+1) * sizeOfTuple):
         printError("size of file is too big for two phase merge sort. Increase mem or decrease file size")
     phase2MaxNumberOfTuples = int(sizeForEachSubFile/sizeOfTuple)
@@ -246,5 +253,7 @@ def main():
         #saveAsFile(outputBuffer,outputPath)
         saveAsFileFileHandler(outputBuffer,outputfileHandler)
     removeLastNewLine(outputfileHandler)
+    deleteInterMediateFiles(numOfSublist)
 if __name__ == '__main__':
     main()
+    print("time taken : ",str(datetime.now() - startTime))
