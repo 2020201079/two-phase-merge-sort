@@ -181,10 +181,11 @@ def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,co
         data[filePoppedFrom].pop(0)
     elif(len(data[filePoppedFrom]) == 0 and not fileHandlers[filePoppedFrom].closed):
         data[filePoppedFrom] = readFromSubList(fileHandlers[filePoppedFrom],phase2MaxNumberOfTuples,colDetails)
-        currTup = data[filePoppedFrom][0]
-        tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
-        heapq.heappush(heap,tupleObj)
-        data[filePoppedFrom].pop(0)
+        if data[filePoppedFrom]:
+            currTup = data[filePoppedFrom][0]
+            tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
+            heapq.heappush(heap,tupleObj)
+            data[filePoppedFrom].pop(0)
     return ans
 
 def removeLastNewLine(outputfileHandler):
@@ -222,8 +223,8 @@ def main():
     outputPath = data[1]
     if( not data[2].isdigit()):
         printError("Memory should be a digit : "+data[2])
-    #memLimit = int(data[2])*1024*1024
-    memLimit = int(data[2])
+    memLimit = int(data[2])*1024*1024
+    #memLimit = int(data[2])
     if(data[3].lower() != "asc" and data[3].lower() != "desc"):
         printError("order must be mentioned either asc or desc")
     sortingOrder = data[3].lower()
@@ -302,7 +303,7 @@ def main():
         if(len(outputBuffer) >= phase2MaxNumberOfTuples):
             saveAsFileFileHandler(outputBuffer,outputfileHandler)
             outputBuffer.clear()
-        printDefaultDicSizes(data)
+        #printDefaultDicSizes(data)
         currMin = getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder,heap)
         if(currMin == []):
             break
