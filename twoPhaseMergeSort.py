@@ -129,7 +129,7 @@ class comparableMin: # using class for custom comparator in heap
         self.colOrder = colOrder
         self.colDetails = colDetails
 
-    def __lt__(self,other):
+    def __lt__(self,other):#[x1,x2,x3] -> [x3,x2,x1] #[y1,y2,y3]->[y3,y2,y1] ## [y3,y2,y1] < [x3,x2,x1]
          newTuple1 = newOrder(self.tup,self.colOrder,self.colDetails)
          newTuple2 = newOrder(other.tup,other.colOrder,other.colDetails)
          return newTuple1 < newTuple2
@@ -223,7 +223,7 @@ def main():
     outputPath = data[1]
     if( not data[2].isdigit()):
         printError("Memory should be a digit : "+data[2])
-    memLimit = int(data[2])*1024*1024
+    memLimit = int(data[2])*1000*1000
     #memLimit = int(data[2])
     if(data[3].lower() != "asc" and data[3].lower() != "desc"):
         printError("order must be mentioned either asc or desc")
@@ -234,8 +234,13 @@ def main():
         colOrder.append(data[k])
     print("order by col : ",colOrder)
 
+
     metaDataFile = "Metadata.txt"
     colDetails = parseMetadataFile(metaDataFile)
+
+    if not colOrder:
+        for c in colDetails:
+            colOrder.append(c[0])
 
     checkIfAllColsExist(colOrder,colDetails)
 
