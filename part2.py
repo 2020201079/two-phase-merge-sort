@@ -283,7 +283,7 @@ def main():
     outputPath = data[1]
     if( not data[2].isdigit()):
         printError("Memory should be a digit : "+data[2])
-    memLimit = int(data[2])
+    memLimit = int(data[2])*1000*1000
     
     if( not data[3].isdigit()):
         printError("Number of threads should be a digit : "+data[3])
@@ -400,7 +400,7 @@ def main():
         #saveAsFile(outputBuffer,outputPath)
         saveAsFileFileHandler(outputBuffer,outputfileHandler)
     removeLastNewLine(outputfileHandler)
-    #deleteInterMediateFiles(numOfSublist)
+    deleteInterMediateFiles(numOfSublist)
 
 if __name__ == '__main__':
     main()
