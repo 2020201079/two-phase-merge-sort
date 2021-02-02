@@ -14,6 +14,132 @@ def printError(error):
     print(error)
     exit()
 
+def getFileHandlers(numOfSublist):
+    ans = []
+    for i in range(1,numOfSublist+1):
+        fileName = "subList"+str(i)+".txt"
+        if not path.exists(fileName):
+            printError("sublist is not created "+fileName)
+        f = open(fileName,'r')
+        ans.append(f)
+    return ans
+
+def readFromSubList(filehandle,maxTuples,colDetails):
+    currSubList = []
+    for i in range(maxTuples):
+        words = filehandle.readline()
+        if not words:
+            filehandle.close()
+            return currSubList
+        else:
+            outputTuple = parseLineRead(words,colDetails)
+            currSubList.append(outputTuple)
+    return currSubList
+
+def newOrder(x,colOrder,colDetails):
+    ans = []
+    for c in colOrder:
+        i = getIndex(c,colDetails)
+        ans.append(x[i])
+    return tuple(ans)
+
+class comparableMin: # using class for custom comparator in heap
+    def __init__(self,tup,fileNo,colOrder,colDetails):
+        self.tup = tup
+        self.fileNo = fileNo
+        self.colOrder = colOrder
+        self.colDetails = colDetails
+
+    def __lt__(self,other):#[x1,x2,x3] -> [x3,x2,x1] #[y1,y2,y3]->[y3,y2,y1] ## [y3,y2,y1] < [x3,x2,x1]
+         newTuple1 = newOrder(self.tup,self.colOrder,self.colDetails)
+         newTuple2 = newOrder(other.tup,other.colOrder,other.colDetails)
+         return newTuple1 < newTuple2
+
+class comparableMax: # using class for custom comparator in heap
+    def __init__(self,tup,fileNo,colOrder,colDetails):
+        self.tup = tup
+        self.fileNo = fileNo
+        self.colOrder = colOrder
+        self.colDetails = colDetails
+
+    def __lt__(self,other):
+         newTuple1 = newOrder(self.tup,self.colOrder,self.colDetails)
+         newTuple2 = newOrder(other.tup,other.colOrder,other.colDetails)
+         return newTuple1 > newTuple2
+
+def removeLastNewLine(outputfileHandler):
+    outputfileHandler.seek(0,os.SEEK_END)
+    pos = outputfileHandler.tell() - 1
+    while pos > 0 and outputfileHandler.read(1) != "\n":
+        pos -= 1
+        outputfileHandler.seek(pos, os.SEEK_SET)
+    if pos > 0:
+        outputfileHandler.seek(pos, os.SEEK_SET)
+        outputfileHandler.truncate()
+    outputfileHandler.close()
+
+def initializeDataDic(data,fileHandlers,phase2MaxNumberOfTuples,colDetails):
+    noOfFiles = len(fileHandlers)
+    for i in range(noOfFiles):
+        if(len(data[i]) == 0 and not fileHandlers[i].closed):
+            data[i] = readFromSubList(fileHandlers[i],phase2MaxNumberOfTuples,colDetails)
+    return data
+
+def makeCompObject(t,i,order,colOrder,colDetails):
+    if(order.lower() == "asc"):
+        ans = comparableMin(t,i,colOrder,colDetails)
+    else:
+        ans = comparableMax(t,i,colOrder,colDetails)
+    return ans
+
+def initializeHeapList(heap,data,sortedOrder,colOrder,colDetails):
+    for i in range(len(data)):
+        heapObject = makeCompObject(data[i][0],i,sortedOrder,colOrder,colDetails) # list of tuples
+        data[i].pop(0) # already present in heap so we can remove it
+        heap.append(heapObject)
+    heapq.heapify(heap)
+    return heap
+
+def deleteInterMediateFiles(numOfSublist):
+    for i in range(1,numOfSublist+1):
+        os.remove("subList"+str(i)+".txt")
+
+def saveAsFileFileHandler(currSubList,filehandle):
+    #currSubList has list of tuples
+    for t in currSubList:
+        for s in t:
+            if(s != t[len(t)-1]):
+                filehandle.write('%s  ' % s)
+            else:
+                filehandle.write('%s' % s)
+        filehandle.write('\n')
+
+def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder,heap):
+    if not heap:
+        return []
+    ansObject = heapq.heappop(heap)
+    ans = ansObject.tup
+    filePoppedFrom = ansObject.fileNo
+    if(len(data[filePoppedFrom])>0):
+        currTup = data[filePoppedFrom][0]
+        tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
+        heapq.heappush(heap,tupleObj)
+        data[filePoppedFrom].pop(0)
+    elif(len(data[filePoppedFrom]) == 0 and not fileHandlers[filePoppedFrom].closed):
+        data[filePoppedFrom] = readFromSubList(fileHandlers[filePoppedFrom],phase2MaxNumberOfTuples,colDetails)
+        if data[filePoppedFrom]:
+            currTup = data[filePoppedFrom][0]
+            tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
+            heapq.heappush(heap,tupleObj)
+            data[filePoppedFrom].pop(0)
+    return ans
+
+def checkIfAllColsExist(colOrder,colDetails):
+    colList = [c[0] for c in colDetails]
+    for c in colOrder:
+        if c not in colList:
+            printError("Col not present in metadata : "+c)
+
 def sortSubList(subList,colOrder,colDetails,sortingOrder):
     if(len(colOrder)==0):
         subList.sort()
@@ -195,13 +321,12 @@ def main():
         printError("Mem size is less than one tuple also mem : "+str(memLimit)+" tuple size "+str( sizeOfTuple))
     print("Number of tuples in a sublist : ",noOfTuplesInSubList)
 
-    tuplesInAThreadMem = int(memForEachThread/sizeOfTuple)
+    tuplesInAThreadMem = int(memForEachThread/lineSize)
     if(tuplesInAThreadMem == 0):
         printError("Mem for each thread is less than size of one tuple")
     #print("Number of tuples handled by each thread : ",tuplesInAThread)
 
     numOfSublist = noOfLinesInFile/noOfTuplesInSubList
-    inputFile = open(fileToSort,'r')
 
     threadDetailsList = [] # contains whihc thread should read from which line
     start = 1
@@ -218,7 +343,6 @@ def main():
     sublistIndex = 0
     while anyThreadNeedToStart(threadDetailsList):
         currThreads = makeThreads(threadDetailsList,fileToSort,colDetails)
-
         startThreads(currThreads)
         for x in currThreads:
             x.join()
@@ -234,6 +358,49 @@ def main():
         print("writing to disk : ",str(sublistIndex))
         saveAsFile(currSubList,"subList"+str(sublistIndex)+".txt")
         currSubList.clear()
+
+
+    numOfSublist = sublistIndex
+    if(numOfSublist == 1):
+        #rename subList1.txt to output and close this func
+        print("whole file fits in mem at once so sorting at once writing to disk")
+        os.rename("subList1.txt",outputPath)
+        return
+    print("number of sublist : ",numOfSublist)
+    print("## running phase - 2")
+    sizeForEachSubFile = int(memLimit/(sublistIndex+1))
+    print("size available for each subfile :",str(sizeForEachSubFile))
+    print("running ... ")
+    if(sizeForEachSubFile < sizeOfTuple or memLimit < (numOfSublist+1) * sizeOfTuple):
+        printError("size of file is too big for two phase merge sort. Increase mem or decrease file size")
+    phase2MaxNumberOfTuples = int(sizeForEachSubFile/sizeOfTuple)
+
+    #dic of list of tuples
+    fileHandlers = getFileHandlers(numOfSublist)
+
+    if os.path.exists(outputPath):
+        os.remove(outputPath)
+    outputfileHandler=open(outputPath, "a+")
+    data = defaultdict(list)
+    data = initializeDataDic(data,fileHandlers,phase2MaxNumberOfTuples,colDetails)
+    heap = []
+    initializeHeapList(heap,data,sortingOrder,colOrder,colDetails) # heapify is applied
+    outputBuffer = []
+    while True:
+        if(len(outputBuffer) >= phase2MaxNumberOfTuples):
+            saveAsFileFileHandler(outputBuffer,outputfileHandler)
+            outputBuffer.clear()
+        #printDefaultDicSizes(data)
+        currMin = getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,colOrder,sortingOrder,heap)
+        if(currMin == []):
+            break
+        else:
+            outputBuffer.append(currMin)
+    if(len(outputBuffer) != 0):
+        #saveAsFile(outputBuffer,outputPath)
+        saveAsFileFileHandler(outputBuffer,outputfileHandler)
+    removeLastNewLine(outputfileHandler)
+    #deleteInterMediateFiles(numOfSublist)
 
 if __name__ == '__main__':
     main()
