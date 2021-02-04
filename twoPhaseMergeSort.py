@@ -279,12 +279,17 @@ def main():
 
     inputFile.close()
     numOfSublist = sublistIndex
+    global timePhase1 
+    timePhase1 = datetime.now() - startTime
+    global startTimePhase2 
+    startTimePhase2= datetime.now()
     if(numOfSublist == 1):
         #rename subList1.txt to output and close this func
         print("whole file fits in mem at once so sorting at once writing to disk")
         os.rename("subList1.txt",outputPath)
         return
     print("number of sublist : ",numOfSublist)
+
     print("## running phase - 2")
     sizeForEachSubFile = int(memLimit/(sublistIndex+1))
     print("size available for each subfile :",str(sizeForEachSubFile))
@@ -319,6 +324,8 @@ def main():
         saveAsFileFileHandler(outputBuffer,outputfileHandler)
     removeLastNewLine(outputfileHandler)
     deleteInterMediateFiles(numOfSublist)
+
 if __name__ == '__main__':
     main()
-    print("time taken : ",str(datetime.now() - startTime))
+    print("time taken for Phase1 :",str(timePhase1))
+    print("time taken for Phase2 : ",str(datetime.now() - startTimePhase2 ))

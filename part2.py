@@ -228,15 +228,17 @@ class threadDetails:
             return False
         return True
 
-def threadingFunc(td,inputFile,colDetails): 
+def threadingFunc(td,inputFile,colDetails,lineSize): 
     #print("thread started id : ",td.id)
+    f = open(inputFile,'r')
+    f.seek((td.currPos-1)*lineSize,0)
     while(td.currPos <= td.end and len(td.data) < td.lineLimit): # should read end line too
-        #print("line no : ",td.currPos)
-        words = linecache.getline(inputFile,td.currPos)
+        words = f.readline()
         #print(words)
         outputTuple = parseLineRead(words,colDetails)
         td.data.append(outputTuple)
         td.currPos += 1
+    f.close()
  
 def parseLineRead(words,colDetails): #return the record as python tuple as per metadata
     startIndex = 0
@@ -260,11 +262,11 @@ def anyThreadNeedToStart(threadList):
             return True
     return False
 
-def makeThreads(threadDetailsList,fileToSort,colDetails):
+def makeThreads(threadDetailsList,fileToSort,colDetails,lineSize):
     ans = []
     for t in threadDetailsList:
         if t.needToStart():
-            ans.append(threading.Thread(target=threadingFunc,args=(t,fileToSort,colDetails,)))
+            ans.append(threading.Thread(target=threadingFunc,args=(t,fileToSort,colDetails,lineSize,)))
     return ans
 
 def main():
@@ -338,16 +340,16 @@ def main():
         else:
             end = noOfLinesInFile
             threadDetailsList.append(threadDetails(i,start,end,tuplesInAThreadMem))
-    for td in threadDetailsList:
-        print("start : ",td.start," stop : ",td.end," limit : ",td.lineLimit," curr pos :",td.currPos)
+    #for td in threadDetailsList:
+        #print("start : ",td.start," stop : ",td.end," limit : ",td.lineLimit," curr pos :",td.currPos)
     sublistIndex = 0
     while anyThreadNeedToStart(threadDetailsList):
-        currThreads = makeThreads(threadDetailsList,fileToSort,colDetails)
+        currThreads = makeThreads(threadDetailsList,fileToSort,colDetails,lineSize)
         startThreads(currThreads)
         for x in currThreads:
             x.join()
-        for td in threadDetailsList:
-            print("start : ",td.start," stop : ",td.end," limit : ",td.lineLimit," curr pos :",td.currPos," stop : ",td.needToStart())
+        #for td in threadDetailsList:
+            #print("start : ",td.start," stop : ",td.end," limit : ",td.lineLimit," curr pos :",td.currPos," stop : ",td.needToStart())
         currSubList = []
         for td in threadDetailsList:
             currSubList += td.data
@@ -361,6 +363,10 @@ def main():
 
 
     numOfSublist = sublistIndex
+    global timePhase1 
+    timePhase1 = datetime.now() - startTime
+    global startTimePhase2 
+    startTimePhase2= datetime.now()
     if(numOfSublist == 1):
         #rename subList1.txt to output and close this func
         print("whole file fits in mem at once so sorting at once writing to disk")
@@ -405,3 +411,5 @@ def main():
 if __name__ == '__main__':
     main()
     print("time taken : ",str(datetime.now() - startTime))
+    print("time taken for Phase1 :",str(timePhase1))
+    print("time taken for Phase2 : ",str(datetime.now() - startTimePhase2 ))
