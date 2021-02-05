@@ -174,6 +174,7 @@ def getMinFromAllSublist(data,fileHandlers,phase2MaxNumberOfTuples,colDetails,co
     ansObject = heapq.heappop(heap)
     ans = ansObject.tup
     filePoppedFrom = ansObject.fileNo
+    del ansObject
     if(len(data[filePoppedFrom])>0):
         currTup = data[filePoppedFrom][0]
         tupleObj = makeCompObject(currTup,filePoppedFrom,sortingOrder,colOrder,colDetails)
